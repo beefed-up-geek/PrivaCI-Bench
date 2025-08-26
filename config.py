@@ -1,15 +1,17 @@
 import os
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+from dotenv import load_dotenv
+load_dotenv()
 
 logging_path = 'log.txt'
-openai_api = ''
-api_key = ''
+openai_api = os.environ['OPENAI_API_KEY']
+api_key = openai_api
 CACHE_DIR = ''
 
 HF_TOKEN = ""
 HF_HOME = ""
-api_model ='gpt-4o-mini'
+api_model = 'gpt-4o-mini'
 
 ### paths for HF format datasets
 HF_cases_path = os.path.join(BASE_DIR, 'HF_cache', 'cases')

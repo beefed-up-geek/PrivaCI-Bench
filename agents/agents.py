@@ -25,8 +25,7 @@ class OpenAI_model:
             )
         else:
             self.client = OpenAI(
-                api_key=self.api_key, 
-                base_url="https://api.oneabc.org/v1"
+                api_key=self.api_key
             )
 
     def compeletion(self, model: str, messages: list, max_retries: int, **kwargs):
@@ -107,7 +106,7 @@ class AgentAction:
                 {"role": "user", "content": message}
             ]
             
-            response = self.chatbot.compeletion(self.api_model, message_list, self.max_retry, temperature = self.temperature, max_tokens = self.max_new_tokens)
+            response = self.chatbot.compeletion(self.api_model, message_list, self.max_retry,)# temperature = self.temperature, max_tokens = self.max_new_tokens)
             
         ## TODO : complete the parsing
         parserd_response = self.parse_fn(response)

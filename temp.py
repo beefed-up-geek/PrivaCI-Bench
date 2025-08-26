@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+'''#!/usr/bin/env python3
 """
 HF_cache/ 이하 모든 하위 폴더의 *.arrow 파일을 찾아
 같은 디렉터리에 같은 이름의 .jsonl 로 저장합니다.
@@ -105,3 +105,68 @@ def main():
 
 if __name__ == "__main__":
     main()
+'''
+import os
+import networkx as nx
+from pyvis.network import Network
+
+LAW_TREE_DIR = "updated_kgs"
+
+# PyVis에서 예약되거나 충돌을 일으킬 수 있는 키들
+RESERVED_NODE_KEYS = {"id"}            # add_node(n_id, **kwargs)와 충돌
+RESERVED_EDGE_KEYS = {"source", "target", "from", "to", "id"}  # add_edge(source, to, **kwargs)와 충돌
+
+def sanitize_attrs(attrs: dict, reserved: set):
+    """attrs에서 reserved 키를 제거한 새 dict을 반환"""
+    if not attrs:
+        return {}
+    return {k: v for k, v in attrs.items() if k not in reserved}
+
+for file in os.listdir(LAW_TREE_DIR):
+    if not file.endswith(".graphml"):
+        continue
+
+    graphml_path = os.path.join(LAW_TREE_DIR, file)
+    html_path = os.path.join(LAW_TREE_DIR, os.path.splitext(file)[0] + ".html")
+    print(f"Processing {graphml_path} -> {html_path}")
+
+    # 1) 그래프 로드
+    G = nx.read_graphml(graphml_path)
+
+    # 2) PyVis 네트워크 생성
+    net = Network(height="800px", width="100%", directed=G.is_directed())
+
+    # 3) 노드 추가 (충돌 키 제거 + title 툴팁 구성)
+    for n, attrs in G.nodes(data=True):
+        safe_attrs = sanitize_attrs(attrs, RESERVED_NODE_KEYS)
+
+        # 툴팁: 노드 속성이 있으면 key: value로 줄바꿈
+        if safe_attrs:
+            safe_attrs["title"] = "<br>".join(f"{k}: {v}" for k, v in safe_attrs.items())
+
+        # label이 없으면 기본적으로 노드 id를 라벨로 보이게끔
+        if "label" not in safe_attrs:
+            safe_attrs["label"] = str(n)
+
+        # PyVis는 문자열 id를 권장
+        net.add_node(str(n), **safe_attrs)
+
+    # 4) 엣지 추가 (충돌 키 제거)
+    # MultiGraph/DiGraph 모두 지원. 평행엣지도 추가 시도
+    if G.is_multigraph():
+        # MultiGraph는 key가 추가로 나오므로 data=True로 attrs만 받되 key는 무시
+        for u, v, key, attrs in G.edges(keys=True, data=True):
+            safe_attrs = sanitize_attrs(attrs, RESERVED_EDGE_KEYS)
+            net.add_edge(str(u), str(v), **safe_attrs)
+    else:
+        for u, v, attrs in G.edges(data=True):
+            safe_attrs = sanitize_attrs(attrs, RESERVED_EDGE_KEYS)
+            net.add_edge(str(u), str(v), **safe_attrs)
+
+    # (선택) 물리 레이아웃 on/off
+    net.toggle_physics(True)
+
+    # 5) HTML 저장 (브라우저 자동 오픈 X)
+    net.write_html(html_path, open_browser=False)
+
+print("Done!")

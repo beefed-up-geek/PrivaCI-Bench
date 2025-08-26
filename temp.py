@@ -110,17 +110,32 @@ import os
 import networkx as nx
 from pyvis.network import Network
 
+import os
+import networkx as nx
+from pyvis.network import Network
+
 LAW_TREE_DIR = "updated_kgs"
 
-# PyVis에서 예약되거나 충돌을 일으킬 수 있는 키들
-RESERVED_NODE_KEYS = {"id"}            # add_node(n_id, **kwargs)와 충돌
-RESERVED_EDGE_KEYS = {"source", "target", "from", "to", "id"}  # add_edge(source, to, **kwargs)와 충돌
+# PyVis에서 예약/충돌 가능 키
+RESERVED_NODE_KEYS = {"id"}
+RESERVED_EDGE_KEYS = {"source", "target", "from", "to", "id", "label"}  # ← label도 제거해서 표시 안 됨
+
+# 관계명이 들어있을 법한 키 후보들(GraphML마다 다를 수 있음)
+RELATION_KEYS = ("relation", "rel", "type", "name", "edge_type", "predicate", "label")
 
 def sanitize_attrs(attrs: dict, reserved: set):
-    """attrs에서 reserved 키를 제거한 새 dict을 반환"""
     if not attrs:
         return {}
     return {k: v for k, v in attrs.items() if k not in reserved}
+
+def get_relation(attrs: dict) -> str | None:
+    """여러 후보 키 중에서 관계명을 추출(소문자/트리밍)"""
+    if not attrs:
+        return None
+    for k in RELATION_KEYS:
+        if k in attrs and isinstance(attrs[k], str):
+            return attrs[k].strip().lower()
+    return None
 
 for file in os.listdir(LAW_TREE_DIR):
     if not file.endswith(".graphml"):
@@ -136,37 +151,36 @@ for file in os.listdir(LAW_TREE_DIR):
     # 2) PyVis 네트워크 생성
     net = Network(height="800px", width="100%", directed=G.is_directed())
 
-    # 3) 노드 추가 (충돌 키 제거 + title 툴팁 구성)
+    # 3) 노드 추가
     for n, attrs in G.nodes(data=True):
         safe_attrs = sanitize_attrs(attrs, RESERVED_NODE_KEYS)
-
-        # 툴팁: 노드 속성이 있으면 key: value로 줄바꿈
-        if safe_attrs:
-            safe_attrs["title"] = "<br>".join(f"{k}: {v}" for k, v in safe_attrs.items())
-
-        # label이 없으면 기본적으로 노드 id를 라벨로 보이게끔
         if "label" not in safe_attrs:
             safe_attrs["label"] = str(n)
-
-        # PyVis는 문자열 id를 권장
         net.add_node(str(n), **safe_attrs)
 
-    # 4) 엣지 추가 (충돌 키 제거)
-    # MultiGraph/DiGraph 모두 지원. 평행엣지도 추가 시도
+    # 4) 엣지 추가: subsume만 남기고, is subsumed by 및 그 외는 제외
+    def edge_keep(attrs: dict) -> bool:
+        rel = get_relation(attrs)
+        return rel == "subsume"  # 이외( None 포함 )는 전부 제거
+
     if G.is_multigraph():
-        # MultiGraph는 key가 추가로 나오므로 data=True로 attrs만 받되 key는 무시
         for u, v, key, attrs in G.edges(keys=True, data=True):
+            if not edge_keep(attrs):
+                continue
             safe_attrs = sanitize_attrs(attrs, RESERVED_EDGE_KEYS)
+            # title도 굳이 넣지 않음 (툴팁 비표시 원하면)
             net.add_edge(str(u), str(v), **safe_attrs)
     else:
         for u, v, attrs in G.edges(data=True):
+            if not edge_keep(attrs):
+                continue
             safe_attrs = sanitize_attrs(attrs, RESERVED_EDGE_KEYS)
             net.add_edge(str(u), str(v), **safe_attrs)
 
     # (선택) 물리 레이아웃 on/off
     net.toggle_physics(True)
 
-    # 5) HTML 저장 (브라우저 자동 오픈 X)
+    # 5) HTML 저장
     net.write_html(html_path, open_browser=False)
 
 print("Done!")

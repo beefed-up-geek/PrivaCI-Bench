@@ -1,0 +1,27 @@
+# WordNet 설치
+brew install wordnet
+
+# 기본 옵션
+    -g 뜻(정의, gloss)도 함께 표시
+    -s 감각 번호(sense number) 표시
+    -n# 특정 감각만 검색 (예: -n1은 1번 의미만)
+
+# 핵심 검색타입
+    동의어(synonyms) -synsn
+    상위어(hypernyms) -hypen
+    하위어(hyponyms) -hypon
+    개요(모든 의미 요약) -over 
+    반의어 -antsn
+    자매어(동일 상위어의 형제어) -coorn
+    
+# 동의어 (명사)
+wn apple -synsn -g
+
+# 상위어 (명사)
+wn apple -hypen -g
+
+# 하위어 (명사)
+wn apple -hypon -g
+
+# 하위어 트리
+wn apple -treen
